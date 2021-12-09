@@ -20,6 +20,15 @@ namespace ergo {
     // NLOHMANN_DEFINE_TYPE_INTRUSIVE(v3, x, y, z); // Can do it both ways
   };
 
+  class Model {
+   public:
+    std::string path;
+
+    Model(): path("") { }
+
+    Model(std::string path): path(path) { }
+  };
+
   class Transform {
    public:
     v3 position;

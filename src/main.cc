@@ -10,66 +10,66 @@ using namespace entt::literals;
 
 using json = nlohmann::json;
 
+#define STRINGIZE(arg)  STRINGIZE1(arg)
+#define STRINGIZE1(arg) STRINGIZE2(arg)
+#define STRINGIZE2(arg) #arg
+
+#define CONCATENATE(arg1, arg2)  CONCATENATE1(arg1, arg2)
+#define CONCATENATE1(arg1, arg2) CONCATENATE2(arg1, arg2)
+#define CONCATENATE2(arg1, arg2) arg1##arg2
+
+#define FOR_EACH_1(what, x, y, ...) what(x, y)
+#define FOR_EACH_2(what, x, y, ...) what(x, y) FOR_EACH_1(what, x, __VA_ARGS__)
+#define FOR_EACH_3(what, x, y, ...) what(x, y) FOR_EACH_2(what, x, __VA_ARGS__)
+#define FOR_EACH_4(what, x, y, ...) what(x, y) FOR_EACH_3(what, x, __VA_ARGS__)
+#define FOR_EACH_5(what, x, y, ...) what(x, y) FOR_EACH_4(what, x, __VA_ARGS__)
+#define FOR_EACH_6(what, x, y, ...) what(x, y) FOR_EACH_5(what, x, __VA_ARGS__)
+#define FOR_EACH_7(what, x, y, ...) what(x, y) FOR_EACH_6(what, x, __VA_ARGS__)
+#define FOR_EACH_8(what, x, y, ...) what(x, y) FOR_EACH_7(what, x, __VA_ARGS__)
+
+#define FOR_EACH_NARG(...)                                     FOR_EACH_NARG_(__VA_ARGS__, FOR_EACH_RSEQ_N())
+#define FOR_EACH_NARG_(...)                                    FOR_EACH_ARG_N(__VA_ARGS__)
+#define FOR_EACH_ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, N, ...) N
+#define FOR_EACH_RSEQ_N()                                      8, 7, 6, 5, 4, 3, 2, 1, 0
+
+#define FOR_EACH_(N, what, x, y, ...) CONCATENATE(FOR_EACH_, N)(what, x, y, __VA_ARGS__)
+#define FOR_EACH(what, x, ...)        FOR_EACH_(FOR_EACH_NARG(__VA_ARGS__), what, x, __VA_ARGS__)
+
+#define REGISTER_COMPONENT_MEMBER(Type, Member) \
+  .data<&Type::Member>(entt::hashed_string::value(#Member)).prop("name"_hs, std::string(#Member))
+
+#define REGISTER_COMPONENT(Type, ...)                                                                              \
+  entt::meta<Type>()                                                                                               \
+    .type(entt::hashed_string::value(#Type))                                                                       \
+    .prop("name"_hs, std::string(#Type))                                                                           \
+    .func<static_cast<Type &(entt::registry::*)(const entt::entity)>(&entt::registry::get<Type>), entt::as_ref_t>( \
+      "get"_hs)                                                                                                    \
+    .func<entt::overload(                                                                                          \
+            static_cast<const Type &(entt::registry::*)(const entt::entity) const>(&entt::registry::get<Type>)),   \
+          entt::as_ref_t>("get"_hs)                                                                                \
+    .func<&entt::registry::emplace_or_replace<Type>, entt::as_ref_t>("emplace"_hs)                                 \
+      FOR_EACH(REGISTER_COMPONENT_MEMBER, Type, __VA_ARGS__)
+
+// entt::meta<v3>().type().ctor<f32, f32, f32>().conv<json>().func<&default_from_json<v3>>("from_json"_hs);
+#define REGISTER_COMPONENT_DATA_TYPE(Type) \
+  entt::meta<Type>().type().conv<json>().func<&default_from_json<Type>>("from_json"_hs)
+#define REGISTER_COMPONENT_DATA_TYPE_CTOR(Type, ...) \
+  entt::meta<Type>().type().ctor<__VA_ARGS__>().conv<json>().func<&default_from_json<Type>>("from_json"_hs)
+
 template<typename T>
 static void default_from_json(const json &j, T &t) {
   t = j.get<T>();
 }
 
 void register_types() {
-  entt::meta<v3>().type().ctor<f32, f32, f32>().conv<json>().func<&default_from_json<f32>>("from_json"_hs);
-  entt::meta<f32>().type().ctor<f32>().conv<json>().func<&default_from_json<f32>>("from_json"_hs);
+  REGISTER_COMPONENT_DATA_TYPE(v3);
+  REGISTER_COMPONENT_DATA_TYPE(f32);
+  REGISTER_COMPONENT_DATA_TYPE(std::string);
 
-  // TODO: Automate component registration into meta with a macro or templates
-  entt::meta<Transform>()
-    .type("transform"_hs)
-    .prop("name"_hs, std::string("transform"))
-    .ctor<json>()
-    .ctor<v3>()
-    .ctor<v3, v3, v3>()
-    .func<static_cast<Transform &(entt::registry::*)(const entt::entity)>(&entt::registry::get<Transform>),
-          entt::as_ref_t>("get"_hs)
-    .func<entt::overload(static_cast<const Transform &(entt::registry::*)(const entt::entity) const>(
-            &entt::registry::get<Transform>)),
-          entt::as_ref_t>("get"_hs)
-    .func<&entt::registry::emplace_or_replace<Transform>, entt::as_ref_t>("emplace"_hs)
-    .data<&Transform::position>("position"_hs)
-    .prop("name"_hs, std::string("position"))
-    .data<&Transform::rotation>("rotation"_hs)
-    .prop("name"_hs, std::string("rotation"))
-    .data<&Transform::scale>("scale"_hs)
-    .prop("name"_hs, std::string("scale"));
-
-  entt::meta<Light>()
-    .type("light"_hs)
-    .prop("name"_hs, std::string("light"))
-    .ctor<f32, v3>()
-    .func<static_cast<Light &(entt::registry::*)(const entt::entity)>(&entt::registry::get<Light>), entt::as_ref_t>(
-      "get"_hs)
-    .func<entt::overload(
-            static_cast<const Light &(entt::registry::*)(const entt::entity) const>(&entt::registry::get<Light>)),
-          entt::as_ref_t>("get"_hs)
-    .func<&entt::registry::emplace_or_replace<Light>, entt::as_ref_t>("emplace"_hs)
-    .data<&Light::color>("color"_hs)
-    .prop("name"_hs, std::string("color"))
-    .data<&Light::intensity>("intensity"_hs)
-    .prop("name"_hs, std::string("intensity"));
-
-  entt::meta<Camera>()
-    .type("camera"_hs)
-    .prop("name"_hs, std::string("camera"))
-    .ctor<f32, f32, f32>()
-    .func<static_cast<Camera &(entt::registry::*)(const entt::entity)>(&entt::registry::get<Camera>), entt::as_ref_t>(
-      "get"_hs)
-    .func<entt::overload(
-            static_cast<const Camera &(entt::registry::*)(const entt::entity) const>(&entt::registry::get<Camera>)),
-          entt::as_ref_t>("get"_hs)
-    .func<&entt::registry::emplace_or_replace<Camera>, entt::as_ref_t>("emplace"_hs)
-    .data<&Camera::fov>("fov"_hs)
-    .prop("name"_hs, std::string("fov"))
-    .data<&Camera::near>("near"_hs)
-    .prop("name"_hs, std::string("near"))
-    .data<&Camera::far>("far"_hs)
-    .prop("name"_hs, std::string("far"));
+  REGISTER_COMPONENT(Transform, position, rotation, scale);
+  REGISTER_COMPONENT(Light, color, intensity);
+  REGISTER_COMPONENT(Camera, fov, near, far);
+  REGISTER_COMPONENT(Model, path);
 }
 
 namespace nlohmann {
@@ -85,6 +85,10 @@ namespace nlohmann {
         registry.visit(entity, [&](const entt::type_info &info) {
           json c = {};
           auto meta = entt::resolve(info);
+          if (!meta) {
+            std::cerr << "Could not resolve meta for type " << info.name() << '\n';
+            return;
+          }
           std::string component_name = meta.prop("name"_hs).value().cast<std::string>();
           auto handle = meta.func("get"_hs).invoke({}, entt::forward_as_meta(registry), entity);
 
@@ -96,7 +100,8 @@ namespace nlohmann {
             member.allow_cast<json>();
             json *member_values = member.try_cast<json>();
             if (!member_values) {
-              std::cerr << "Could not convert to json " << name << '\n';
+              std::cerr << "Could not convert to json " << data.type().info().name() << " | " << name << " inside "
+                        << handle.type().info().name() << '\n';
               continue;
             }
 
@@ -126,6 +131,10 @@ namespace nlohmann {
 
           i32 i = 0;
           for (auto d : meta.data()) {
+            if (c["data"].empty()) {
+              std::cerr << "No data for component " << c["type"] << '\n';
+              continue;
+            }
             const json &data = c["data"][i++];
             if (data["name"] != d.prop("name"_hs).value().cast<std::string>()) {
               std::cerr << "Data name does not match component name\n Probable ill formed data\n";
@@ -152,11 +161,15 @@ i32 main() {
   entt::registry registry;
   entt::entity e = registry.create();
   registry.emplace<Transform>(e, v3(1.0f, 2.0f, 3.0f));
-  registry.emplace<Light>(e, 1.0f, v3(0.3f, 0.3f, 0.3f));
+  registry.emplace<Light>(e, 0.5f, v3(0.3f, 0.3f, 0.3f));
 
   entt::entity e2 = registry.create();
   registry.emplace<Transform>(e2, v3(1.0f, 2.0f, 3.0f));
   registry.emplace<Camera>(e2, 90.0f, 0.0f, 1000.0f);
+
+  entt::entity e3 = registry.create();
+  registry.emplace<Transform>(e3, v3(1.0f, 2.0f, 3.0f));
+  registry.emplace<Model>(e3, "/some/path/to/model.gltf");
 
   json serialized = registry;
   entt::registry deserialized = serialized;
