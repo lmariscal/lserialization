@@ -10,66 +10,10 @@ using namespace entt::literals;
 
 using json = nlohmann::json;
 
-#define STRINGIZE(arg)  STRINGIZE1(arg)
-#define STRINGIZE1(arg) STRINGIZE2(arg)
-#define STRINGIZE2(arg) #arg
-
-#define CONCATENATE(arg1, arg2)  CONCATENATE1(arg1, arg2)
-#define CONCATENATE1(arg1, arg2) CONCATENATE2(arg1, arg2)
-#define CONCATENATE2(arg1, arg2) arg1##arg2
-
-#define FOR_EACH_1(what, x, y, ...) what(x, y)
-#define FOR_EACH_2(what, x, y, ...) what(x, y) FOR_EACH_1(what, x, __VA_ARGS__)
-#define FOR_EACH_3(what, x, y, ...) what(x, y) FOR_EACH_2(what, x, __VA_ARGS__)
-#define FOR_EACH_4(what, x, y, ...) what(x, y) FOR_EACH_3(what, x, __VA_ARGS__)
-#define FOR_EACH_5(what, x, y, ...) what(x, y) FOR_EACH_4(what, x, __VA_ARGS__)
-#define FOR_EACH_6(what, x, y, ...) what(x, y) FOR_EACH_5(what, x, __VA_ARGS__)
-#define FOR_EACH_7(what, x, y, ...) what(x, y) FOR_EACH_6(what, x, __VA_ARGS__)
-#define FOR_EACH_8(what, x, y, ...) what(x, y) FOR_EACH_7(what, x, __VA_ARGS__)
-
-#define FOR_EACH_NARG(...)                                     FOR_EACH_NARG_(__VA_ARGS__, FOR_EACH_RSEQ_N())
-#define FOR_EACH_NARG_(...)                                    FOR_EACH_ARG_N(__VA_ARGS__)
-#define FOR_EACH_ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, N, ...) N
-#define FOR_EACH_RSEQ_N()                                      8, 7, 6, 5, 4, 3, 2, 1, 0
-
-#define FOR_EACH_(N, what, x, y, ...) CONCATENATE(FOR_EACH_, N)(what, x, y, __VA_ARGS__)
-#define FOR_EACH(what, x, ...)        FOR_EACH_(FOR_EACH_NARG(__VA_ARGS__), what, x, __VA_ARGS__)
-
-#define REGISTER_COMPONENT_MEMBER(Type, Member) \
-  .data<&Type::Member>(entt::hashed_string::value(#Member)).prop("name"_hs, std::string(#Member))
-
-#define REGISTER_COMPONENT(Type, ...)                                                                              \
-  entt::meta<Type>()                                                                                               \
-    .type(entt::hashed_string::value(#Type))                                                                       \
-    .prop("name"_hs, std::string(#Type))                                                                           \
-    .func<static_cast<Type &(entt::registry::*)(const entt::entity)>(&entt::registry::get<Type>), entt::as_ref_t>( \
-      "get"_hs)                                                                                                    \
-    .func<entt::overload(                                                                                          \
-            static_cast<const Type &(entt::registry::*)(const entt::entity) const>(&entt::registry::get<Type>)),   \
-          entt::as_ref_t>("get"_hs)                                                                                \
-    .func<&entt::registry::emplace_or_replace<Type>, entt::as_ref_t>("emplace"_hs)                                 \
-      FOR_EACH(REGISTER_COMPONENT_MEMBER, Type, __VA_ARGS__)
-
-// entt::meta<v3>().type().ctor<f32, f32, f32>().conv<json>().func<&default_from_json<v3>>("from_json"_hs);
-#define REGISTER_COMPONENT_DATA_TYPE(Type) \
-  entt::meta<Type>().type().conv<json>().func<&default_from_json<Type>>("from_json"_hs)
-#define REGISTER_COMPONENT_DATA_TYPE_CTOR(Type, ...) \
-  entt::meta<Type>().type().ctor<__VA_ARGS__>().conv<json>().func<&default_from_json<Type>>("from_json"_hs)
-
-template<typename T>
-static void default_from_json(const json &j, T &t) {
-  t = j.get<T>();
-}
-
-void register_types() {
+void register_data_types() {
   REGISTER_COMPONENT_DATA_TYPE(v3);
   REGISTER_COMPONENT_DATA_TYPE(f32);
   REGISTER_COMPONENT_DATA_TYPE(std::string);
-
-  REGISTER_COMPONENT(Transform, position, rotation, scale);
-  REGISTER_COMPONENT(Light, color, intensity);
-  REGISTER_COMPONENT(Camera, fov, near, far);
-  REGISTER_COMPONENT(Model, path);
 }
 
 namespace nlohmann {
@@ -94,6 +38,7 @@ namespace nlohmann {
 
           c["data"] = {};
           c["type"] = component_name;
+          c["hash"] = meta.func("get_hash"_hs).invoke({}).cast<i32>();
           for (entt::meta_data data : handle.type().data()) {
             std::string name = data.prop("name"_hs).value().cast<std::string>();
             auto member = data.get(handle);
@@ -153,7 +98,7 @@ namespace nlohmann {
 } // namespace nlohmann
 
 i32 main() {
-  register_types();
+  register_data_types();
 
   v3 a(1.0f, 2.0f, 3.0f);
   json aj = a;

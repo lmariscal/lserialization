@@ -1,12 +1,12 @@
 #pragma once
 
+#include "comp_m.hh"
+
+#include <entt/entt.hpp>
 #include <ergo/types.hh>
 #include <iostream>
-#include <nlohmann/json.hpp>
 
 namespace ergo {
-
-  using namespace nlohmann;
 
   class v3 {
    public:
@@ -17,7 +17,7 @@ namespace ergo {
     v3(): x(0), y(0), z(0) { }
     v3(f32 x, f32 y, f32 z): x(x), y(y), z(z) { }
 
-    // NLOHMANN_DEFINE_TYPE_INTRUSIVE(v3, x, y, z); // Can do it both ways
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(v3, x, y, z); // Can do it both ways
   };
 
   class Model {
@@ -27,6 +27,8 @@ namespace ergo {
     Model(): path("") { }
 
     Model(std::string path): path(path) { }
+
+    REGISTER_COMPONENT(Model, path)
   };
 
   class Transform {
@@ -42,6 +44,8 @@ namespace ergo {
       this->rotation = rotation;
       this->scale = scale;
     }
+
+    REGISTER_COMPONENT(Transform, position, rotation, scale)
   };
 
   class Light {
@@ -55,6 +59,8 @@ namespace ergo {
       this->intensity = intensity;
       this->color = color;
     }
+
+    REGISTER_COMPONENT(Light, intensity, color)
   };
 
   class Camera {
@@ -70,25 +76,27 @@ namespace ergo {
       this->near = near;
       this->far = far;
     }
+
+    REGISTER_COMPONENT(Camera, fov, near, far)
   };
 
 } // namespace ergo
 
-namespace nlohmann {
+// namespace nlohmann {
 
-  template<>
-  struct adl_serializer<ergo::v3> {
-    static void to_json(json &j, const ergo::v3 &v) {
-      j["x"] = v.x;
-      j["y"] = v.y;
-      j["z"] = v.z;
-    }
+//   template<>
+//   struct adl_serializer<ergo::v3> {
+//     static void to_json(json &j, const ergo::v3 &v) {
+//       j["x"] = v.x;
+//       j["y"] = v.y;
+//       j["z"] = v.z;
+//     }
 
-    static void from_json(const json &j, ergo::v3 &v) {
-      v.x = j["x"];
-      v.y = j["y"];
-      v.z = j["z"];
-    }
-  };
+//     static void from_json(const json &j, ergo::v3 &v) {
+//       v.x = j["x"];
+//       v.y = j["y"];
+//       v.z = j["z"];
+//     }
+//   };
 
-} // namespace nlohmann
+// } // namespace nlohmann
