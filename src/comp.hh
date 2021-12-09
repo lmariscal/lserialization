@@ -63,11 +63,6 @@ namespace ergo {
     }
   };
 
-  class Scene {
-   public:
-    std::unordered_map<i32, std::string> component_id_to_name;
-  };
-
 } // namespace ergo
 
 namespace nlohmann {

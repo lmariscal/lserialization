@@ -10,18 +10,7 @@ using namespace entt::literals;
 
 using json = nlohmann::json;
 
-i32 main() {
-  entt::registry registry;
-  entt::entity e = registry.create();
-  registry.emplace<Transform>(e, v3(1.0f, 2.0f, 3.0f));
-  registry.emplace<Light>(e, 1.0f, v3(0.3f, 0.3f, 0.3f));
-
-  entt::entity e2 = registry.create();
-  registry.emplace<Transform>(e2, v3(1.0f, 2.0f, 3.0f));
-  registry.emplace<Camera>(e2, 90.0f, 0.0f, 1000.0f);
-
-  Scene scene;
-
+void register_types() {
   entt::meta<v3>().type().ctor<f32, f32, f32>().conv<json>();
   entt::meta<f32>().type().ctor<f32>().conv<json>();
 
@@ -69,36 +58,59 @@ i32 main() {
     .prop("name"_hs, std::string("near"))
     .data<&Camera::far>("far"_hs)
     .prop("name"_hs, std::string("far"));
+}
 
-  json j;
-  j["entities"] = {};
+namespace nlohmann {
 
-  registry.each([&](entt::entity entity) {
-    json e;
-    e["components"] = {};
-    registry.visit(entity, [&](const entt::type_info &info) {
-      json c = {};
-      auto meta = entt::resolve(info);
-      std::string name = meta.prop("name"_hs).value().cast<std::string>();
-      auto handle = meta.func("get"_hs).invoke({}, entt::forward_as_meta(registry), entity);
+  template<>
+  struct adl_serializer<entt::registry> {
+    static void to_json(json &j, const entt::registry &registry) {
+      j["entities"] = {};
+      registry.each([&](entt::entity entity) {
+        json e;
+        e["components"] = {};
+        registry.visit(entity, [&](const entt::type_info &info) {
+          json c = {};
+          auto meta = entt::resolve(info);
+          std::string name = meta.prop("name"_hs).value().cast<std::string>();
+          auto handle = meta.func("get"_hs).invoke({}, entt::forward_as_meta(registry), entity);
 
-      for (entt::meta_data data : handle.type().data()) {
-        std::string name = data.prop("name"_hs).value().cast<std::string>();
-        auto d = data.get(handle);
-        d.allow_cast<json>();
-        json *dj = d.try_cast<json>();
-        if (!dj) {
-          std::cerr << "Could not convert to json " << name << '\n';
-          continue;
-        }
-        c[name] = *dj;
-      }
-      e["components"][name] = c;
-    });
-    j["entities"].push_back(e);
-  });
+          for (entt::meta_data data : handle.type().data()) {
+            std::string name = data.prop("name"_hs).value().cast<std::string>();
+            auto d = data.get(handle);
+            d.allow_cast<json>();
+            json *dj = d.try_cast<json>();
+            if (!dj) {
+              std::cerr << "Could not convert to json " << name << '\n';
+              continue;
+            }
+            c[name] = *dj;
+          }
+          e["components"][name] = c;
+        });
+        j["entities"].push_back(e);
+      });
+    }
+  };
 
-  std::cout << j.dump(2) << '\n';
+} // namespace nlohmann
+
+i32 main() {
+  register_types();
+
+  entt::registry registry;
+  entt::entity e = registry.create();
+  registry.emplace<Transform>(e, v3(1.0f, 2.0f, 3.0f));
+  registry.emplace<Light>(e, 1.0f, v3(0.3f, 0.3f, 0.3f));
+
+  entt::entity e2 = registry.create();
+  registry.emplace<Transform>(e2, v3(1.0f, 2.0f, 3.0f));
+  registry.emplace<Camera>(e2, 90.0f, 0.0f, 1000.0f);
+
+  json serialized = registry;
+  // std::cout << serialized.dump(2) << '\n';
+
+  json deserialized; // TODO
 
   return 0;
 }
