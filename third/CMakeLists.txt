@@ -1,7 +1,8 @@
-# include(FetchContent)
 
 # JSON
 
-set(JSON_BuildTests OFF CACHE INTERNAL "")
-
 add_subdirectory(json)
+
+# Entt
+
+add_subdirectory(entt)

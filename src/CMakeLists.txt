@@ -2,9 +2,12 @@ find_package(ergo REQUIRED)
 
 file(GLOB_RECURSE TEST_SOURCES
   ${CMAKE_SOURCE_DIR}/src/*.cc
+  ${CMAKE_SOURCE_DIR}/src/*.hh
 )
 
 add_executable(test ${TEST_SOURCES})
+
+target_sources(test PUBLIC ${TEST_SOURCES})
 
 set_target_properties(test PROPERTIES
   CXX_STANDARD 17
@@ -23,6 +26,7 @@ set_target_properties(test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DI
 set_target_properties(test PROPERTIES OUTPUT_NAME test)
 
 target_link_libraries(test PRIVATE ergo)
+target_link_libraries(test PRIVATE EnTT)
 target_link_libraries(test PRIVATE nlohmann_json::nlohmann_json)
 
 # Set sources of IDEs
@@ -31,6 +35,4 @@ file(GLOB_RECURSE TEST_HEADERS
   ${CMAKE_SOURCE_DIR}/src/*.hh
 )
 
-list(APPEND TEST_SOURCES ${TEST_HEADERS})
-
-target_sources(test PUBLIC ${TEST_SOURCES})
+target_sources(test PUBLIC ${TEST_HEADERS})

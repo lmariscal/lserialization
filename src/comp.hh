@@ -1,84 +1,90 @@
 #pragma once
 
 #include <ergo/types.hh>
+#include <iostream>
 #include <nlohmann/json.hpp>
-#include <unordered_map>
 
 namespace ergo {
 
-  using json = nlohmann::json;
+  using namespace nlohmann;
 
-  template<typename C>
-  class IMember {
+  class v3 {
    public:
-    virtual ~IMember() = default;
-    virtual void FromJSON(C &obj, const json &j) const = 0;
-    virtual json ToJSON(const C &obj) const = 0;
+    f32 x;
+    f32 y;
+    f32 z;
+
+    v3(): x(0), y(0), z(0) { }
+    v3(f32 x, f32 y, f32 z): x(x), y(y), z(z) { }
+
+    // NLOHMANN_DEFINE_TYPE_INTRUSIVE(v3, x, y, z); // Can do it both ways
   };
 
-  template<typename C, typename T>
-  class Member: public IMember<C> {
+  class Transform {
    public:
-    Member(T C::*ptr): _ptr(ptr) { }
+    v3 position;
+    v3 rotation;
+    v3 scale;
 
-    void FromJSON(C &obj, const json &j) const override {
-      obj.*_ptr = j;
+    Transform(): position(0, 0, 0), rotation(0, 0, 0), scale(1, 1, 1) { }
+
+    Transform(v3 position, v3 rotation = { 0.0f, 0.0f, 0.0f }, v3 scale = { 1.0f, 1.0f, 1.0f }) {
+      this->position = position;
+      this->rotation = rotation;
+      this->scale = scale;
     }
-
-    json ToJSON(const C &obj) const override {
-      return json(obj.*_ptr);
-    }
-
-   private:
-    T C::*_ptr;
   };
 
-  template<typename C>
-  class ClassMetaInfo {
+  class Light {
    public:
-    static void Deserialize(C &obj, const json &j) {
-      for (const auto &m : _members) {
-        const auto &name = m.first;
-        const auto &member = m.second;
+    f32 intensity;
+    v3 color;
 
-        member->FromJSON(obj, j[name]);
-      }
+    Light(): intensity(1.0f), color({ 1.0f, 1.0f, 1.0f }) { }
+
+    Light(f32 intensity, v3 color = { 1.0f, 1.0f, 1.0f }) {
+      this->intensity = intensity;
+      this->color = color;
     }
-
-    static json Serialize(const C &obj) {
-      json j;
-
-      for (const auto &m : _members) {
-        const auto &name = m.first;
-        const auto &member = m.second;
-
-        j[name] = member->ToJSON(obj);
-      }
-
-      return j;
-    }
-
-    template<typename T>
-    static void RegisterMember(const std::string &name, T C::*ptr) {
-      _members[name] = std::make_unique<Member<C, T>>(ptr);
-    }
-
-    using MemberPtr = std::unique_ptr<IMember<C>>;
-    using MemberMap = std::unordered_map<std::string, MemberPtr>;
-
-   private:
-    inline static MemberMap _members;
   };
 
-  class Person {
+  class Camera {
    public:
-    std::string name;
-    i32 age;
+    f32 fov;
+    f32 near;
+    f32 far;
 
-    static void RegisterMembers() {
-      ClassMetaInfo<Person>::RegisterMember("name", &Person::name);
-      ClassMetaInfo<Person>::RegisterMember("age", &Person::age);
+    Camera(): fov(45.0f), near(0.1f), far(100.0f) { }
+
+    Camera(f32 fov, f32 near, f32 far) {
+      this->fov = fov;
+      this->near = near;
+      this->far = far;
     }
+  };
+
+  class Scene {
+   public:
+    std::unordered_map<i32, std::string> component_id_to_name;
   };
 
 } // namespace ergo
+
+namespace nlohmann {
+
+  template<>
+  struct adl_serializer<ergo::v3> {
+    static void to_json(json &j, const ergo::v3 &v) {
+      j["x"] = v.x;
+      j["y"] = v.y;
+      j["z"] = v.z;
+    }
+
+    static void from_json(const json &j, ergo::v3 &v) {
+      v.x = j["x"];
+      v.y = j["y"];
+      v.z = j["z"];
+    }
+  };
+
+} // namespace nlohmann
