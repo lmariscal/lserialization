@@ -28,7 +28,7 @@ namespace ergo {
 
     Transform(): position(0, 0, 0), rotation(0, 0, 0), scale(1, 1, 1) { }
 
-    Transform(v3 position, v3 rotation = { 0.0f, 0.0f, 0.0f }, v3 scale = { 1.0f, 1.0f, 1.0f }) {
+    Transform(v3 position, v3 rotation = { 0.0f, 0.0f, 0.0f }, v3 scale = { 3.0f, 2.0f, 1.0f }) {
       this->position = position;
       this->rotation = rotation;
       this->scale = scale;
