@@ -2,6 +2,7 @@
 
 #include <entt/entt.hpp>
 #include <ergo/types.hh>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 
@@ -20,33 +21,52 @@ namespace nlohmann {
 
   template<>
   struct adl_serializer<entt::registry> {
-    static void to_json(json &j, const entt::registry &registry) {
+    static void to_json(json &j, const entt::registry &c_registry) {
+      entt::registry &registry = const_cast<entt::registry &>(c_registry);
+
       j["entities"] = {};
       registry.each([&](entt::entity entity) {
         json e;
         e["components"] = {};
 
-        registry.visit(entity, [&](const entt::type_info &info) {
+        for (auto [id, pool] : registry.storage()) {
+          // TODO: Rework how componenets are thought of. In the current system, it is represented as
+          // Entity => [Component...], but it should be represented as Component => [Entity...]. And in the
+          // deserialization, it should all be tight up. It is called a Pool for a reason...
+          if (!pool.contains(entity)) { continue; }
+
           json c = {};
-          auto meta = entt::resolve(info);
+          auto meta = entt::resolve(id);
           if (!meta) {
-            std::cerr << "Could not resolve meta for type " << info.name() << '\n';
-            return;
+            std::cerr << "Could not resolve meta for type " << id << '\n';
+            continue;
           }
+
           std::string component_name = meta.prop("name"_hs).value().cast<std::string>();
-          auto handle = meta.func("get"_hs).invoke({}, entt::forward_as_meta(registry), entity);
+          auto func = meta.func("get"_hs);
+          if (!func) {
+            std::cerr << "Could not find getter for type " << id << '\n';
+            continue;
+          }
+
+          auto handle = func.invoke({}, entt::forward_as_meta(registry), entity);
+
+          if (!handle) {
+            std::cerr << "Could not invoke get function for type " << id << '\n';
+            continue;
+          }
 
           c["data"] = {};
           c["type"] = component_name;
-          c["hash"] = meta.func("get_hash"_hs).invoke({}).cast<i32>();
-          for (entt::meta_data data : handle.type().data()) {
+          c["id"] = id;
+          for (entt::meta_data data : meta.data()) {
             std::string name = data.prop("name"_hs).value().cast<std::string>();
             auto member = data.get(handle);
             member.allow_cast<json>();
             json *member_values = member.try_cast<json>();
             if (!member_values) {
               std::cerr << "Could not convert to json " << data.type().info().name() << " | " << name << " inside "
-                        << handle.type().info().name() << '\n';
+                        << meta.info().name() << '\n';
               continue;
             }
 
@@ -57,7 +77,7 @@ namespace nlohmann {
             c["data"].push_back(mj);
           }
           e["components"].push_back(c);
-        });
+        }
 
         j["entities"].push_back(e);
       });
@@ -70,25 +90,33 @@ namespace nlohmann {
         auto entity = registry.create();
         for (auto &c : e["components"]) {
 
-          auto hs = entt::hashed_string::value(c["type"].get<std::string>().c_str());
-          auto meta = entt::resolve(hs);
+          auto meta = entt::resolve(c["id"].get<entt::id_type>());
+          if (!meta) {
+            std::cerr << "Could not resolve meta for type " << c["type"] << '\n';
+            continue;
+          }
+
           auto handle = meta.func("emplace"_hs).invoke({}, entt::forward_as_meta(registry), entity);
 
-          i32 i = 0;
           for (auto d : meta.data()) {
             if (c["data"].empty()) {
               std::cerr << "No data for component " << c["type"] << '\n';
               continue;
             }
-            const json &data = c["data"][i++];
-            if (data["name"] != d.prop("name"_hs).value().cast<std::string>()) {
-              std::cerr << "Data name does not match component name\n Probable ill formed data\n";
-              continue;
+
+            std::string name = d.prop("name"_hs).value().cast<std::string>();
+            bool found = false;
+            for (auto &dj : c["data"]) {
+              if (found || dj["name"] != name) continue;
+
+              auto member = d.get(handle);
+              d.type().func("from_json"_hs).invoke({}, entt::forward_as_meta(dj["data"]), member.as_ref());
+              d.set(handle, member);
+
+              found = true;
             }
 
-            auto member = d.get(handle);
-            d.type().func("from_json"_hs).invoke({}, entt::forward_as_meta(data["data"]), member.as_ref());
-            d.set(handle, member);
+            if (!found) { std::cerr << "Could not find data for component " << c["type"] << " | " << name << '\n'; }
           }
         }
       }
@@ -118,11 +146,29 @@ i32 main() {
 
   json serialized = registry;
   entt::registry deserialized = serialized;
+  json comp = deserialized;
+
   std::cout << "--------\n";
   std::cout << serialized.dump(2) << '\n';
 
   std::cout << "COMPARATION --------\n";
-  std::cout << ((json)deserialized).dump(2) << '\n';
+  std::cout << (comp).dump(2) << '\n';
+
+  std::vector<byte> buffer = json::to_cbor(serialized);
+  // cout buffer in hex with padding 0
+  for (auto b : buffer) {
+    std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)b << ' ';
+  }
+
+  // save buffer to file as binary
+  std::ofstream file("test.bin", std::ios::binary);
+  file.write((const char *)buffer.data(), buffer.size());
+  file.close();
+
+  // save serialized to file as json
+  std::ofstream file2("test.json", std::ios::binary);
+  file2 << serialized.dump();
+  file2.close();
 
   return 0;
 }

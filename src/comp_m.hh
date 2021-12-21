@@ -31,13 +31,10 @@
 
 #define REGISTER_COMPONENT_FACTORY(Type, ...)                                                                      \
   entt::meta<Type>()                                                                                               \
-    .type(entt::hashed_string::value(#Type))                                                                       \
+    .type()                                                                                                        \
     .prop("name"_hs, std::string(#Type))                                                                           \
     .func<static_cast<Type &(entt::registry::*)(const entt::entity)>(&entt::registry::get<Type>), entt::as_ref_t>( \
       "get"_hs)                                                                                                    \
-    .func<entt::overload(                                                                                          \
-            static_cast<const Type &(entt::registry::*)(const entt::entity) const>(&entt::registry::get<Type>)),   \
-          entt::as_ref_t>("get"_hs)                                                                                \
     .func<&entt::registry::emplace_or_replace<Type>, entt::as_ref_t>("emplace"_hs)                                 \
     .func<&Type::get_hash>("get_hash"_hs) FOR_EACH(REGISTER_COMPONENT_MEMBER, Type, __VA_ARGS__)
 
